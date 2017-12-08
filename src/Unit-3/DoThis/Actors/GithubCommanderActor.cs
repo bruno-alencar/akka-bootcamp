@@ -63,11 +63,12 @@ namespace GithubActors.Actors
                 BecomeAsking();
             });
         }
-
         private void BecomeAsking()
         {
             _canAcceptJobSender = Sender;
-            pendingJobReplies = 3; //the number of routees
+            // block, but ask the router for the number of routees. Avoids magic numbers.
+            pendingJobReplies = _coordinator.Ask<Routees>(new GetRoutees())
+              .Result.Members.Count();
             Become(Asking);
         }
 
@@ -108,7 +109,12 @@ namespace GithubActors.Actors
         }
         protected override void PreStart()
         {
-            _coordinator = Context.ActorOf(Props.Create(() => new GithubCoordinatorActor()), ActorPaths.GithubCoordinatorActor.Name);
+            // create a broadcast router who will ask all 
+            // of them if they're available for work
+            _coordinator =
+                Context.ActorOf(Props.Create(() => new GithubCoordinatorActor())
+                  .WithRouter(FromConfig.Instance),
+                  ActorPaths.GithubCoordinatorActor.Name);
             base.PreStart();
         }
 
